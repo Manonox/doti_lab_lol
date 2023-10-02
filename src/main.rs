@@ -87,41 +87,53 @@ fn main() -> io::Result<()> {
     println!("N = {}", packets.len());
     thread::sleep(Duration::from_secs_f32(1.0));
 
+    let mut time_axis = Vec::<i64>::default();
+    time_axis.push(0);
+    let mut syn_axis = Vec::<i32>::default();
     let mut syn_count = 0;
-    let mut ack_count = 0;
+    let mut synack_axis = Vec::<i32>::default();
+    let mut synack_count = 0;
+    syn_axis.push(syn_count); synack_axis.push(synack_count);
+    let mut csv_content = String::new();
 
-    for packet in packets {
-        // let id = packet.event.ip.id.to_be();
-        // println!("Id -> {}", id);
-        let flags = unsafe { packet.event.proto.tcp.flags }.to_be();
-        let syn = (flags & 0b00000001) > 0;
-        let ack = (flags & 0b00010000) > 0;
-        if syn { syn_count += 1 }
-        if ack { ack_count += 1 }
-        // println!("{flags:08b} -> {ack}, {syn}\n");
-        // thread::sleep(Duration::from_secs_f32(0.1));
+    let mut begin_time_option: Option<i64> = None;
+
+    packets.iter().for_each(|x| {
+        if x.event.ip.protocol != 6_u8 { return }
+        if x.is_syn() { syn_count += 1 }
+        if x.is_synack() { synack_count += 1 }
+
+        let mut time = x.header.timestamp.as_usec();
+        if begin_time_option.is_none() {
+            begin_time_option = Some(time);
+        }
+
+        time -= begin_time_option.unwrap();
+
+        time_axis.push(time);
+        syn_axis.push(syn_count);
+        synack_axis.push(synack_count);
+
+        csv_content.push_str(format!("{},{}\n", time, syn_count - synack_count).as_str());
+        // thread::sleep(Duration::from_secs_f32(1.0));
+    });
+
+    fs::write("plot.csv", csv_content)?;
+    println!("Saved plot");
+    println!("[SYN]: {}, [SYN, ACK]: {}", syn_count, synack_count);
+
+
+    let mut csv_time_between_packets = String::new();
+    thread::sleep(Duration::from_secs_f32(1.0));
+    let mut i = 0;
+    for w in packets.windows(2) {
+        let p1 = &w[0]; let p2 = &w[1];
+        let usec = p2.header.timestamp.as_usec() - p1.header.timestamp.as_usec();
+        let sec = (usec as f64) / 1000000.0;
+        csv_time_between_packets.push_str(format!("{},{:.6}\n", i, sec).as_str());
+        i += 1;
     }
-
-    println!("SYN: {}, ACK: {}", syn_count, ack_count);
-
-
-    // let first_packet = packets[0];
-    // let begin_timestamp = first_packet.header.timestamp;
-    // let begin_sec = begin_timestamp.sec; let begin_usec = begin_timestamp.usec;
-    
-    // for i in 0..(packets.len()-1) {
-    //     let packets = [packets[i], packets[i + 1]];
-    //     let timestamps = packets.map(|p| {p.header.timestamp});
-    //     // println!("{:#?}, {:#?}", timestamps[0], timestamps[1]);
-    //     let mut sec = timestamps[1].sec - timestamps[0].sec;
-    //     let mut usec = 0_u32;
-    //     if timestamps[0].usec > timestamps[1].usec {
-    //         sec -= 1;
-    //         usec = (1000000 + timestamps[1].usec) - timestamps[0].usec;
-    //     } else {usec = timestamps[1].usec - timestamps[0].usec }
-        
-    //     println!("{} <-T-> {} = {}.{:06}", i, i + 1, sec, usec);
-    // }
+    fs::write("time_between_packets.csv", csv_time_between_packets)?;
 
     Ok(())
 }

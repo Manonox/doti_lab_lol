@@ -17,6 +17,12 @@ pub struct TimeValue {
     pub usec: u32,
 }
 
+impl TimeValue {
+    pub fn as_usec(&self) -> i64 {
+        return (self.sec as i64) * 1000000 + (self.usec as i64)
+    }
+}
+
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PacketHeader {
@@ -114,6 +120,20 @@ pub struct Event {
 pub struct Packet {
     pub header: PacketHeader,
     pub event: Event,
+}
+
+impl Packet {
+    pub fn is_syn(&self) -> bool {
+        let flags = unsafe { self.event.proto.tcp.flags }.to_be();
+        //return (flags & 0b00000010) > 0;
+        return flags == 0b00000010;
+    }
+
+    pub fn is_synack(&self) -> bool {
+        let flags = unsafe { self.event.proto.tcp.flags };
+        //return (flags & 0b00010000) > 0 && (flags & 0b00000010) > 0;
+        return flags == 0b00010010;
+    }
 }
 
 impl Default for Packet {
