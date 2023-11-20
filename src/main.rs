@@ -9,6 +9,7 @@ use std::mem;
 use std::ops::Shl;
 use std::slice;
 use std::{thread, time::Duration};
+use std::process::Command;
 
 
 fn main() -> io::Result<()> {
@@ -121,6 +122,15 @@ fn main() -> io::Result<()> {
     fs::write("plot.csv", csv_content)?;
     println!("Saved plot");
     println!("[SYN]: {}, [SYN, ACK]: {}", syn_count, synack_count);
+    
+    Command::new("python")
+        .arg("plot.py")
+        .arg("plot.csv")
+        .arg("Time")
+        .arg("Syn-SynAck")
+        .arg("16")
+        .output()
+        .expect("Failed to execute command");
 
 
     let mut csv_time_between_packets = String::new();
@@ -134,6 +144,16 @@ fn main() -> io::Result<()> {
         i += 1;
     }
     fs::write("time_between_packets.csv", csv_time_between_packets)?;
+
+    
+    // Command::new("python")
+    //     .arg("plot.py")
+    //     .arg("time_between_packets.csv")
+    //     .arg("Index")
+    //     .arg("TimeSincePrevious")
+    //     .arg("1")
+    //     .output()
+    //     .expect("Failed to execute command");
 
     Ok(())
 }
